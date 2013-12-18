@@ -30,6 +30,7 @@ import extensions.toPsiMemberExt
 import collection.mutable
 import lang.resolve.processor.BaseProcessor
 import com.intellij.lang.java.lexer.JavaLexer
+import org.jetbrains.plugins.scala.lang.psi.api.expr.ScAnnotation
 
 /**
  * @author Alexander Podkhalyuzin
@@ -142,11 +143,26 @@ class ScObjectImpl extends ScTypeDefinitionImpl with ScObject with ScTemplateDef
     })(PsiModificationTracker.OUT_OF_CODE_BLOCK_MODIFICATION_COUNT))
   }
 
+  def annotatedMethod: Option[PsiMethod] = {
+    getAnnotations.find(an => an.getQualifiedName == "Add") match {
+      case Some(x: PsiAnnotation) =>
+        val tmp = ScalaPsiElementFactory.createMethodWithContext("def foo: Int = 1", getContext, this)
+        tmp.setSynthetic(this)
+        Some(tmp)
+      case _ => None
+    }
+  }
+
   protected def objectSyntheticMembersImpl: Seq[PsiMethod] = {
     if (isSyntheticObject) return Seq.empty
+    val res = new ArrayBuffer[PsiMethod]
+    annotatedMethod match {
+      case Some(x: PsiMethod) =>
+        res += x
+      case _ =>
+    }
     ScalaPsiUtil.getCompanionModule(this) match {
       case Some(c: ScClass) if c.isCase =>
-        val res = new ArrayBuffer[PsiMethod]
         val texts = c.getSyntheticMethodsText
         Seq(texts._1, texts._2).foreach(s => {
           try {
@@ -159,7 +175,7 @@ class ScObjectImpl extends ScTypeDefinitionImpl with ScObject with ScTemplateDef
           }
         })
         res.toSeq
-      case _ => Seq.empty
+      case _ => res
     }
   }
 
